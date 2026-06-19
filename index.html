@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Ayan — 3D Creator | Portfolio</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            darkBg: '#0C0C0C',
+            lightSlate: '#D7E2EA',
+          },
+          fontFamily: {
+            sans: ['Kanit', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/"
+      }
+    }
+  </script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Share+Tech+Mono&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <style>
+    /* ========== GLOBAL & LOADER STYLES ========== */
+    :root {
+      --base-200: #d1d9b8;
+      --base-300: #0f0f0f;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Kanit", sans-serif;
+      background-color: #0C0C0C;
+      color: #D7E2EA;
+      overflow-x: hidden;
+    }
+
+    /* 3D Canvas layer */
+    #three-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 40; /* 3D Butterfly thakbe screen er bhalobhabe upore */
+      pointer-events: none;
+    }
+
+    /* BATASHE PHULER DALA DOLAR ANIMATION EFFECT */
+    /* Uporer phul tike sotti bhashar (floating) effect deyar jonno wave motion add kora hoyeche */
+    @keyframes windSwayTop {
+      0%, 100% {
+        transform: rotate(0deg) translateY(0px) translateX(0px);
+      }
+      33% {
+        transform: rotate(-1.8deg) translateY(12px) translateX(-6px);
+      }
+      66% {
+        transform: rotate(1.2deg) translateY(-6px) translateX(3px);
+      }
+    }
+
+    @keyframes windSwayBottom {
+      0%, 100% {
+        transform: rotate(0deg) translate(0px, 0px);
+      }
+      50% {
+        transform: rotate(1deg) translate(3px, -2px);
+      }
+    }
+
+    /* Top Corner Flower Branch (Hanging from top-right corner organically) */
+    .flower-top-branch {
+      position: fixed;
+      top: -3%;
+      right: -3%;
+      width: clamp(220px, 32vw, 500px);
+      z-index: 45; /* 3D Canvas dynamic overlay */
+      pointer-events: none; /* Pointer disabled jate click blocking na hoy */
+      transform-origin: top right;
+      animation: windSwayTop 9s ease-in-out infinite; /* Slower and smoother wave animation */
+      filter: drop-shadow(-12px 18px 35px rgba(0, 0, 0, 0.8));
+    }
+
+    /* Bottom Corner Flower Branch (Sprouting vertically from bottom-left corner) */
+    .flower-bottom-branch {
+      position: fixed;
+      bottom: -60px; /* Cut portion screen-er niche lukiye rakha hoyeche */
+      left: -2%;
+      width: clamp(180px, 26vw, 400px);
+      z-index: 45;
+      pointer-events: none;
+      transform-origin: bottom left;
+      animation: windSwayBottom 12s ease-in-out infinite;
+      filter: drop-shadow(10px -10px 25px rgba(0, 0, 0, 0.7));
+    }
+
+    /* Loader overlay */
+    #preloader {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background-color: var(--base-200);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.8s cubic-bezier(0.23, 1, 0.32, 1), visibility 0.8s;
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #preloader.hidden-loader {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loader-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .counter {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: "Share Tech Mono", monospace;
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 700;
+      z-index: 10;
+      pointer-events: none;
+      letter-spacing: -0.05em;
+      color: var(--base-300);
+    }
+
+    .counter::after {
+      content: '%';
+      font-size: 0.5em;
+      vertical-align: super;
+      opacity: 0.7;
+    }
+
+    #loader-svg {
+      width: 85%;
+      height: 85%;
+      max-width: 900px;
+      max-height: 900px;
+      transform-origin: center center;
+    }
+
+    #loader-svg path {
+      fill: none;
+      stroke: rgba(15, 15, 15, 0.08);
+      stroke-width: 1.5px;
+      stroke-dasharray: 6 18;
+    }
+
+    #loader-svg .orbit-text {
+      fill: var(--base-300);
+      text-transform: uppercase;
+      font-size: 2.75rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+    }
+
+    @media (max-width: 1000px) {
+      #loader-svg {
+        width: 95%;
+        height: 95%;
+      }
+      #loader-svg .orbit-text {
+        font-size: 2.5rem;
+      }
+    }
+
+    /* ========== MAIN SITE STYLES ========== */
+    .hero-heading {
+      background: linear-gradient(180deg, #646973 0%, #BBCCD7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0C0C0C;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #252830;
+      border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3B3F4A;
+    }
+
+    .marquee-tile {
+      transition: transform 0.3s ease;
+    }
+    .marquee-tile:hover {
+      transform: scale(1.03);
+    }
+
+    #projects-horizontal-track {
+      will-change: transform;
+      cursor: grab;
+    }
+    #projects-horizontal-track:active {
+      cursor: grabbing;
+    }
+
+    /* Main content container */
+    #main-content {
+      position: relative;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased bg-darkBg text-lightSlate">
+
+  <img src="https://i.ibb.co.com/HDtZktCT/Picsart-26-06-17-17-37-52-377.png" alt="[Top Pink Flower Branch]" class="flower-top-branch" />
+  <img src="https://i.ibb.co.com/mFrkdL1h/Picsart-26-06-17-17-37-18-447.png" alt="[Bottom Blue Flower Branch]" class="flower-bottom-branch" />
+
+  <canvas id="three-canvas"></canvas>
+
+  <div id="preloader">
+    <div class="loader-container">
+      <svg id="loader-svg" viewBox="-425 -425 1850 1850" xmlns="http://www.w3.org/2000/svg">
+        <path id="loader-orbit-1" d="M 500,-275 A 775,775 0 0,1 500,1275 A 775,775 0 0,1 500,-275" />
+        <path id="loader-orbit-2" d="M 500,-200 A 700,700 0 0,1 500,1200 A 700,700 0 0,1 500,-200" />
+        <path id="loader-orbit-3" d="M 500,-125 A 625,625 0 0,1 500,1125 A 625,625 0 0,1 500,-125" />
+        <path id="loader-orbit-4" d="M 500,-50 A 550,550 0 0,1 500,1050 A 550,550 0 0,1 500,-50" />
+        <path id="loader-orbit-5" d="M 500,25 A 475,475 0 0,1 500,975 A 475,475 0 0,1 500,25" />
+        <path id="loader-orbit-6" d="M 500,100 A 400,400 0 0,1 500,900 A 400,400 0 0,1 500,100" />
+        <path id="loader-orbit-7" d="M 500,175 A 325,325 0 0,1 500,825 A 325,325 0 0,1 500,175" />
+        <path id="loader-orbit-8" d="M 500,250 A 250,250 0 0,1 500,750 A 250,250 0 0,1 500,250" />
+
+        <text class="orbit-text"><textPath href="#loader-orbit-1" startOffset="30%" textLength="300">Dev arian</textPath></text>
+        <text class="orbit-text"><textPath href="#loader-orbit-2" startOffset="31%" textLength="280">Front Design</textPath></text>
+        <text class="orbit-text"><textPath href="#loader-orbit-3" startOffset="33%" textLength="240">student</textPath></text>
+        <text class="orbit-text"><textPath href="#loader-orbit-4" startOffset="32%" textLength="260">i love you</textPath></text>
+        <text class="orbit-text"><textPath href="#loader-orbit-5" startOffset="30%" textLength="290">maria</textPath></text>
+        <text class="orbit-text"><textPath href="#loader-orbit-6" startOffset="31%" textLength="200">arian00001</textPath></text>
+        <text class="orbit-text"><textPath href="#loader-orbit-7" startOffset="33%" textLength="210">New dising</textPath></text>
+        <text class="orbit-text"><textPath href="#loader-orbit-8" startOffset="32%" textLength="190">arian ahamed ayan</textPath></text>
+      </svg>
+      <div class="counter">
+        <p id="counter-value">0</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="main-content" style="visibility: hidden; opacity: 0; transition: opacity 0.5s ease;">
+    
+    <section id="hero" class="relative min-h-screen flex flex-col justify-between overflow-x-clip pb-10">
+      <nav class="flex justify-between items-center px-6 md:px-10 pt-6 md:pt-8 z-50 relative">
+        <a href="#hero" class="text-xl md:text-2xl font-black tracking-tighter uppercase hero-heading">A.3D</a>
+        <div class="hidden md:flex gap-10 lg:gap-14">
+          <button onclick="scrollToSection('about')" class="text-lightSlate text-sm lg:text-[1.1rem] font-medium uppercase tracking-wider hover:opacity-70 transition-opacity">About</button>
+          <button onclick="scrollToSection('services')" class="text-lightSlate text-sm lg:text-[1.1rem] font-medium uppercase tracking-wider hover:opacity-70 transition-opacity">Services</button>
+          <button onclick="scrollToSection('projects')" class="text-lightSlate text-sm lg:text-[1.1rem] font-medium uppercase tracking-wider hover:opacity-70 transition-opacity">Projects</button>
+          <button onclick="openContactModal()" class="text-lightSlate text-sm lg:text-[1.1rem] font-medium uppercase tracking-wider hover:opacity-70 transition-opacity">Contact</button>
+        </div>
+        <button onclick="toggleMobileMenu()" class="md:hidden text-lightSlate hover:opacity-80 p-1 z-50 relative" aria-label="Menu">
+          <i data-lucide="menu" id="menu-icon"></i>
+        </button>
+        <div id="mobile-menu" class="fixed inset-0 bg-[#0C0C0C]/95 z-50 hidden flex-col justify-center items-center gap-8 md:hidden">
+          <button onclick="scrollToSection('about', true)" class="text-lightSlate text-2xl font-bold uppercase">About</button>
+          <button onclick="scrollToSection('services', true)" class="text-lightSlate text-2xl font-bold uppercase">Services</button>
+          <button onclick="scrollToSection('projects', true)" class="text-lightSlate text-2xl font-bold uppercase">Projects</button>
+          <button onclick="openContactModal(); toggleMobileMenu();" class="text-lightSlate text-2xl font-bold uppercase">Contact</button>
+        </div>
+      </nav>
+
+      <div class="absolute inset-0 flex justify-center items-center z-10 overflow-hidden pointer-events-none">
+        <div id="magnet-wrapper" class="w-[280px] sm:w-[360px] md:w-[440px] lg:w-[520px] filter drop-shadow-[0_10px_40px_rgba(182,0,168,0.2)] pointer-events-auto select-none">
+          <img src="https://i.ibb.co.com/yFSmvLrX/Picsart-26-06-17-00-32-11-480.png" alt="Ayan Portrait" class="w-full h-auto object-contain select-none pointer-events-none" draggable="false">
+        </div>
+      </div>
+
+      <div class="flex-grow flex flex-col justify-between px-6 md:px-10 pt-10">
+        <div class="overflow-hidden w-full relative z-20 pointer-events-none">
+          <h1 class="hero-heading font-black uppercase tracking-tight leading-none whitespace-nowrap w-full text-[14vw] sm:text-[15vw] md:text-[16vw] lg:text-[17.5vw] mt-6 sm:mt-4 md:-mt-5">hi iam ayan</h1>
+        </div>
+        <div class="flex justify-between items-end pb-7 sm:pb-8 md:pb-10 relative z-30 mt-32 sm:mt-20">
+          <p class="text-lightSlate font-light uppercase tracking-wide leading-snug text-[clamp(0.75rem,1.4vw,1.5rem)] max-w-[160px] sm:max-w-[220px] md:max-w-[260px]">a 3d creator driven by crafting striking and unforgettable projects</p>
+          <button onclick="openContactModal()" style="background: linear-gradient(123deg, #18011F 7%, #B600A8 37%, #7621B0 72%, #BE4C00 100%); box-shadow: 0px 4px 4px rgba(181, 1, 167, 0.25), 4px 4px 12px #7721B1 inset;" class="rounded-full uppercase tracking-widest text-white font-medium px-8 py-3 sm:px-10 sm:py-3.5 md:px-12 md:py-4 text-[10px] sm:text-xs md:text-sm lg:text-base outline outline-2 outline-white -outline-offset-[3px] hover:scale-105 active:scale-95 transition-all duration-300">Contact Me</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="marquee-section" class="bg-[#0C0C0C] pt-24 sm:pt-32 md:pt-40 pb-10 overflow-hidden relative z-20">
+      <div class="flex flex-col gap-3">
+        <div class="w-full overflow-hidden"><div id="marquee-row-1" class="flex gap-3 whitespace-nowrap transition-transform duration-100 ease-out"></div></div>
+        <div class="w-full overflow-hidden"><div id="marquee-row-2" class="flex gap-3 whitespace-nowrap transition-transform duration-100 ease-out"></div></div>
+      </div>
+    </section>
+
+    <section id="about" class="relative min-h-screen bg-[#0C0C0C] px-5 sm:px-8 md:px-10 py-20 flex flex-col justify-center items-center overflow-hidden z-20">
+      <div id="decor-moon" class="absolute top-[4%] left-[1%] sm:left-[2%] md:left-[4%] z-0 select-none pointer-events-none"><img src="https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/moon_icon.11395d36.png" alt="Moon" class="w-[120px] sm:w-[160px] md:w-[210px] h-auto object-contain animate-pulse"></div>
+      <div id="decor-torus" class="absolute bottom-[8%] left-[3%] sm:left-[6%] md:left-[10%] z-0 select-none pointer-events-none"><img src="https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/p59_1.4659672e.png" alt="Torus" class="w-[100px] sm:w-[140px] md:w-[180px] h-auto object-contain rotate-12"></div>
+      <div id="decor-lego" class="absolute top-[4%] right-[1%] sm:right-[2%] md:right-[4%] z-0 select-none pointer-events-none"><img src="https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/lego_icon-1.703bb594.png" alt="Lego" class="w-[120px] sm:w-[160px] md:w-[210px] h-auto object-contain" style="animation: bounce 6s infinite ease-in-out;"></div>
+      <div id="decor-group" class="absolute bottom-[8%] right-[3%] sm:right-[6%] md:right-[10%] z-0 select-none pointer-events-none"><img src="https://shrug-person-78902957.figma.site/_components/v2/ebb2b8f25d8e24d5f0a5ca8af4c950de81aa2fd7/Group_134-1.2e04f3ce.png" alt="Group" class="w-[130px] sm:w-[170px] md:w-[220px] h-auto object-contain"></div>
+      <div class="relative z-10 flex flex-col items-center max-w-4xl text-center">
+        <h2 class="hero-heading font-black uppercase leading-none tracking-tight text-[clamp(3rem,12vw,160px)] mb-10 sm:mb-14 md:mb-16">About me</h2>
+        <div class="mb-16 sm:mb-20 md:mb-24 px-4"><div id="about-text-reveal" class="text-lightSlate font-medium leading-relaxed max-w-[560px] text-[clamp(1rem,2vw,1.35rem)] flex flex-wrap justify-center"></div></div>
+        <button onclick="openContactModal()" style="background: linear-gradient(123deg, #18011F 7%, #B600A8 37%, #7621B0 72%, #BE4C00 100%); box-shadow: 0px 4px 4px rgba(181, 1, 167, 0.25), 4px 4px 12px #7721B1 inset;" class="rounded-full uppercase tracking-widest text-white font-medium px-8 py-3 sm:px-10 sm:py-3.5 md:px-12 md:py-4 text-[10px] sm:text-xs md:text-sm lg:text-base outline outline-2 outline-white -outline-offset-[3px] hover:scale-105 active:scale-95 transition-all">Contact Me</button>
+      </div>
+    </section>
+
+    <section id="services" class="bg-white text-darkBg rounded-t-[40px] sm:rounded-t-[50px] md:rounded-t-[60px] px-5 sm:px-8 md:px-10 py-20 sm:py-24 md:py-32 relative z-20">
+      <div class="max-w-5xl mx-auto">
+        <h2 class="text-darkBg font-black uppercase text-center tracking-tight leading-none text-[clamp(3rem,12vw,160px)] mb-16 sm:mb-20 md:mb-28">Services</h2>
+        <div id="services-list" class="flex flex-col border-t border-[#0C0C0C]/15"></div>
+      </div>
+    </section>
+
+    <section id="projects" class="bg-darkBg text-lightSlate rounded-t-[40px] sm:rounded-t-[50px] md:rounded-t-[60px] -mt-10 sm:-mt-12 md:-mt-14 relative z-30">
+      <div id="projects-pin-container" class="relative h-[250vh] w-full">
+        <div class="sticky top-0 h-screen w-full flex flex-col justify-center items-center overflow-hidden py-12">
+          <div class="max-w-7xl w-full mx-auto px-4 sm:px-8 md:px-10 flex flex-col justify-center h-full">
+            <div class="mb-4 sm:mb-6 flex justify-between items-end">
+              <h2 class="hero-heading font-black uppercase leading-none tracking-tight text-[clamp(2.2rem,6vw,90px)]">Projects</h2>
+              <p class="text-lightSlate/40 text-[10px] sm:text-xs uppercase tracking-widest">Scroll or drag horizontal track</p>
+            </div>
+            <div class="w-full relative flex items-center overflow-hidden h-[45vh] sm:h-[55vh]">
+              <div id="projects-horizontal-track" class="flex flex-row items-center gap-6 sm:gap-10 md:gap-14 px-[5vw] sm:px-[10vw] w-max select-none"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="contact-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-[#0C0C0C]/90 backdrop-blur-md">
+      <div class="relative w-full max-w-lg bg-[#141414] border-2 border-lightSlate/30 rounded-[30px] p-6 sm:p-8 md:p-10 text-lightSlate overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+        <div class="absolute top-0 right-0 w-48 h-48 bg-[#B600A8]/20 blur-[80px] rounded-full pointer-events-none"></div>
+        <button onclick="closeContactModal()" class="absolute top-6 right-6 text-lightSlate hover:opacity-70"><i data-lucide="x" class="w-6 h-6"></i></button>
+        <div id="form-content">
+          <h3 class="text-3xl font-black uppercase tracking-tight mb-2 hero-heading">Let's Create</h3>
+          <p class="text-lightSlate/70 font-light text-sm mb-4">Drop Ayan a direct request.</p>
+          <p class="text-xs font-medium uppercase tracking-widest text-[#B600A8] mb-6">Direct Email: <a href="mailto:ayanahamed9929@gmail.com" class="text-lightSlate underline hover:text-[#B600A8]">ayanahamed9929@gmail.com</a></p>
+          <form onsubmit="handleFormSubmit(event)" class="space-y-4">
+            <div><label class="block text-xs uppercase tracking-widest text-lightSlate/60 font-semibold mb-1">Your Name</label><input type="text" required id="form-name" placeholder="e.g. Satoshi" class="w-full bg-[#1C1C1C] border border-lightSlate/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#B600A8] text-white animate-none"></div>
+            <div><label class="block text-xs uppercase tracking-widest text-lightSlate/60 font-semibold mb-1">Email</label><input type="email" required id="form-email" placeholder="name@company.com" class="w-full bg-[#1C1C1C] border border-lightSlate/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#B600A8] text-white animate-none"></div>
+            <div><label class="block text-xs uppercase tracking-widest text-lightSlate/60 font-semibold mb-1">Details</label><textarea rows="4" required id="form-message" placeholder="Tell me about your project..." class="w-full bg-[#1C1C1C] border border-lightSlate/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#B600A8] text-white resize-none animate-none"></textarea></div>
+            <div class="pt-2"><button type="submit" style="background: linear-gradient(123deg, #18011F 7%, #B600A8 37%, #7621B0 72%, #BE4C00 100%); box-shadow: 0px 4px 4px rgba(181, 1, 167, 0.25), 4px 4px 12px #7721B1 inset;" class="w-full rounded-xl uppercase tracking-widest text-white font-bold py-4 text-xs sm:text-sm outline outline-2 outline-white -outline-offset-[3px] hover:scale-[1.02] active:scale-[0.98] transition-all">Send Inquiry</button></div>
+          </form>
+        </div>
+        <div id="success-content" class="hidden flex flex-col items-center justify-center py-12 text-center">
+          <i data-lucide="check-circle-2" class="w-16 h-16 text-[#B600A8] mb-4 animate-bounce"></i>
+          <h3 class="text-2xl font-black uppercase tracking-tight mb-2">Message Received!</h3>
+          <p class="text-lightSlate/80 font-light max-w-xs">Ayan is on it.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer class="bg-darkBg text-lightSlate/60 text-xs sm:text-sm py-12 px-6 border-t border-lightSlate/10 relative z-20">
+      <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+        <div><p class="uppercase tracking-wider font-medium text-white mb-1">AYAN — 3D CREATOR & DESIGNER</p><p class="font-light">&copy; <span id="copyright-year">2026</span> Ayan. All rights reserved.</p><p class="mt-2 text-[#D7E2EA]/50">Inquiries: <a href="mailto:ayanahamed9929@gmail.com" class="text-[#B600A8] hover:underline">ayanahamed9929@gmail.com</a></p></div>
+        <div class="flex gap-6 uppercase tracking-widest font-semibold text-white">
+          <button onclick="window.scrollTo({ top: 0, behavior: 'smooth' })" class="hover:text-[#B600A8]">Back To Top</button>
+          <span class="text-lightSlate/20">/</span>
+          <button onclick="openContactModal()" class="hover:text-[#B600A8]">Get In Touch</button>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module">
+    // ========== 3D BUTTERFLY SCENE ==========
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // 3D Scene toiri kora hocche
+    const canvas = document.getElementById('three-canvas');
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 5);
+    
+    const renderer = new THREE.WebGLRenderer({ 
+      canvas, 
+      alpha: true,
+      antialias: true 
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    // Lighting setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 3.5);
+    directionalLight.position.set(5, 8, 5);
+    scene.add(directionalLight);
+    
+    const backLight = new THREE.DirectionalLight(0xb600a8, 4.5);
+    backLight.position.set(-3, -2, -5);
+    scene.add(backLight);
+
+    // Butterfly model & animation variables
+    let butterflyModel = null;
+    let mixer = null;
+    const clock = new THREE.Clock();
+    const loader = new GLTFLoader();
+    
+    loader.load(
+      'https://raw.githubusercontent.com/arian00001/3d/main/animated_butterfly.glb',
+      (gltf) => {
+        butterflyModel = gltf.scene;
+        // Perfect scaling setup
+        butterflyModel.scale.set(0.8, 0.8, 0.8);
+        butterflyModel.position.set(0, 0, 0);
+        scene.add(butterflyModel);
+        
+        // Butterfly er built-in flapping wing animation set kora hocche
+        if (gltf.animations && gltf.animations.length > 0) {
+          mixer = new THREE.AnimationMixer(butterflyModel);
+          gltf.animations.forEach((clip) => {
+            mixer.clipAction(clip).play();
+          });
+        }
+        console.log('Butterfly model loaded successfully!');
+      },
+      (progress) => {
+        const percent = (progress.loaded / progress.total * 100);
+        console.log(`Loading butterfly: ${Math.round(percent)}%`);
+      },
+      (error) => {
+        console.error('Error loading butterfly model:', error);
+      }
+    );
+
+    // Particles background
+    const particlesGeometry = new THREE.BufferGeometry();
+    const particlesCount = 500;
+    const positions = new Float32Array(particlesCount * 3);
+    
+    for (let i = 0; i < particlesCount * 3; i += 3) {
+      positions[i] = (Math.random() - 0.5) * 20;
+      positions[i + 1] = (Math.random() - 0.5) * 20;
+      positions[i + 2] = (Math.random() - 0.5) * 10;
+    }
+    
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    
+    const particlesMaterial = new THREE.PointsMaterial({
+      size: 0.02,
+      color: 0xb600a8,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending
+    });
+    
+    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particles);
+
+    // Scroll & Mouse damping variables
+    let targetScrollY = 0;
+    let currentScrollY = 0;
+    let mouseX = 0;
+    let mouseY = 0;
+    let targetMouseX = 0;
+    let targetMouseY = 0;
+
+    window.addEventListener('scroll', () => {
+      targetScrollY = window.scrollY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      targetMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    // Main render cycle
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Animation updating
+      const delta = clock.getDelta();
+      if (mixer) {
+        mixer.update(delta);
+      }
+
+      // Smooth scroll and mouse calculation
+      currentScrollY += (targetScrollY - currentScrollY) * 0.05;
+      mouseX += (targetMouseX - mouseX) * 0.05;
+      mouseY += (targetMouseY - mouseY) * 0.05;
+
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollProgress = currentScrollY / (maxScroll || 1);
+
+      if (butterflyModel) {
+        // Natural Lissajous pattern to dynamically roam the screen beautifully
+        const time = Date.now() * 0.001;
+        
+        // Alada alada phase use kore smooth natural path toiri kora hocche
+        const baseX = Math.sin(time * 0.4) * 1.3;
+        const baseY = Math.cos(time * 0.3) * 0.9;
+        const baseZ = Math.sin(time * 0.5) * 0.4;
+
+        // Scroll offset mapping
+        const scrollOffsetX = (scrollProgress - 0.5) * 2.5;
+        const scrollOffsetY = scrollProgress * 1.8 - 0.9;
+
+        // Position summation (Base wander + Scroll drift + Mouse hover reaction)
+        let targetX = baseX + scrollOffsetX + mouseX * 0.4;
+        let targetY = baseY + scrollOffsetY + mouseY * 0.4;
+        let targetZ = baseZ - 1.8 + scrollProgress * 1.2;
+
+        // Dynamic viewport safety boundaries based on screen size (Mobile check)
+        const aspect = window.innerWidth / window.innerHeight;
+        const screenMarginX = aspect > 1 ? 1.9 : 0.9; // Mobile desktop limit adjustment
+        const screenMarginY = 1.1;
+
+        // Safe clamping so butterfly never crosses the screen edges
+        butterflyModel.position.x = Math.max(-screenMarginX, Math.min(screenMarginX, targetX));
+        butterflyModel.position.y = Math.max(-screenMarginY, Math.min(screenMarginY, targetY));
+        butterflyModel.position.z = targetZ;
+
+        // Organic rotative tilting while turning around
+        const tiltX = Math.cos(time * 0.3) * 0.1 + mouseY * 0.2;
+        const tiltY = Math.sin(time * 0.2) * 0.5 + mouseX * 0.5;
+        const tiltZ = Math.sin(time * 0.4) * 0.2 - mouseX * 0.3; // Wings rolling on left/right turn
+
+        butterflyModel.rotation.x = tiltX;
+        butterflyModel.rotation.y = tiltY;
+        butterflyModel.rotation.z = tiltZ;
+
+        // Soft scale oscillation
+        const pulse = 0.8 + Math.sin(time * 1.5) * 0.03;
+        butterflyModel.scale.setScalar(pulse);
+      }
+
+      // Rotate particle stars
+      particles.rotation.x += 0.0002;
+      particles.rotation.y += 0.0003;
+
+      renderer.render(scene, camera);
+    }
+
+    // Window size change handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+
+  <script>
+    // ========== PRELOADER & MAIN SITE LOGIC ==========
+    (function() {
+      const preloader = document.getElementById('preloader');
+      const mainContent = document.getElementById('main-content');
+      const counterText = document.getElementById('counter-value');
+      
+      const allImages = document.querySelectorAll('img');
+      const totalImages = allImages.length;
+      let loadedImages = 0;
+
+      let countVal = { value: 0 };
+      let countTween = gsap.to(countVal, {
+        value: 100,
+        duration: 4.5,
+        ease: "power2.out",
+        onUpdate: function() {
+          if (counterText) counterText.textContent = Math.floor(countVal.value);
+        }
+      });
+
+      // Orbit rotations
+      const textPaths = document.querySelectorAll("#loader-svg textPath");
+      const startTextLengths = Array.from(textPaths).map(tp => parseFloat(tp.getAttribute("textLength")) || 200);
+      const startTextOffsets = Array.from(textPaths).map(tp => parseFloat(tp.getAttribute("startOffset")) || 30);
+      const targetTextLengths = [4000, 3500, 3250, 3000, 2500, 2000, 1500, 1250];
+      const orbitRadii = [775, 700, 625, 550, 475, 400, 325, 250];
+      const maxOrbitRadius = orbitRadii[0];
+      
+      textPaths.forEach((textPath, index) => {
+        const delay = (textPaths.length - 1 - index) * 0.1;
+        const duration = 1 + (orbitRadii[index] / maxOrbitRadius) * 0.25;
+        const pathLength = 2 * Math.PI * orbitRadii[index] * 3;
+        const textIncrease = targetTextLengths[index] - startTextLengths[index];
+        const offsetAdj = (textIncrease / 2 / pathLength) * 100;
+        const targetOffset = startTextOffsets[index] - offsetAdj;
+        gsap.to(textPath, {
+          attr: { textLength: targetTextLengths[index], startOffset: targetOffset + "%" },
+          duration: duration,
+          delay: delay,
+          ease: "power2.inOut",
+          yoyo: true,
+          repeat: -1
+        });
+      });
+
+      let loaderRotation = 0;
+      function animateRotation() {
+        const spin = Math.random() < 0.5 ? 1 : -1;
+        loaderRotation += 45 * spin;
+        gsap.to("#loader-svg", {
+          rotation: loaderRotation,
+          duration: 3,
+          ease: "power2.inOut",
+          onComplete: animateRotation
+        });
+      }
+      animateRotation();
+
+      function imageLoaded() {
+        loadedImages++;
+        const loadPercent = Math.floor((loadedImages / totalImages) * 100);
+        if (countTween) countTween.kill();
+        countTween = gsap.to(countVal, {
+          value: loadPercent,
+          duration: 0.5,
+          ease: "power1.out",
+          onUpdate: () => {
+            if (counterText) counterText.textContent = Math.floor(countVal.value);
+          }
+        });
+        
+        if (loadedImages >= totalImages) {
+          if (countTween) countTween.kill();
+          gsap.to(countVal, {
+            value: 100,
+            duration: 0.4,
+            onUpdate: () => { if (counterText) counterText.textContent = Math.floor(countVal.value); },
+            onComplete: finishLoading
+          });
+        }
+      }
+
+      function imageError() {
+        loadedImages++;
+        if (loadedImages >= totalImages) {
+          if (countTween) countTween.kill();
+          gsap.to(countVal, {
+            value: 100,
+            duration: 0.3,
+            onUpdate: () => { if (counterText) counterText.textContent = Math.floor(countVal.value); },
+            onComplete: finishLoading
+          });
+        }
+      }
+
+      function finishLoading() {
+        setTimeout(() => {
+          if (preloader) preloader.classList.add('hidden-loader');
+          if (mainContent) {
+            mainContent.style.visibility = 'visible';
+            mainContent.style.opacity = '1';
+          }
+          document.body.style.overflow = '';
+          if (window.lucide) lucide.createIcons();
+          window.dispatchEvent(new Event('scroll'));
+        }, 300);
+      }
+
+      allImages.forEach(img => {
+        if (img.complete && img.naturalWidth !== 0) {
+          loadedImages++;
+        } else {
+          img.addEventListener('load', imageLoaded);
+          img.addEventListener('error', imageError);
+        }
+      });
+
+      if (totalImages === 0 || loadedImages === totalImages) {
+        finishLoading();
+      }
+
+      document.body.style.overflow = 'hidden';
+
+      // ========== MAIN SITE SCRIPTS ==========
+      const copyrightYearEl = document.getElementById('copyright-year');
+      if (copyrightYearEl) copyrightYearEl.textContent = new Date().getFullYear();
+
+      window.toggleMobileMenu = function() {
+        const menu = document.getElementById('mobile-menu');
+        const icon = document.getElementById('menu-icon');
+        if (!menu || !icon) return;
+        if (menu.classList.contains('hidden')) {
+          menu.classList.remove('hidden');
+          menu.classList.add('flex');
+          icon.setAttribute('data-lucide', 'x');
+        } else {
+          menu.classList.add('hidden');
+          menu.classList.remove('flex');
+          icon.setAttribute('data-lucide', 'menu');
+        }
+        if (window.lucide) lucide.createIcons();
+      };
+
+      window.scrollToSection = function(id, isMobile = false) {
+        if (isMobile) window.toggleMobileMenu();
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      };
+
+      // Magnetic effect
+      const magnet = document.getElementById('magnet-wrapper');
+      function applyMagnetic(clientX, clientY) {
+        if (!magnet) return;
+        const rect = magnet.getBoundingClientRect();
+        const centerX = rect.left + rect.width/2;
+        const centerY = rect.top + rect.height/2;
+        const distX = clientX - centerX;
+        const distY = clientY - centerY;
+        const dist = Math.sqrt(distX*distX + distY*distY);
+        if (dist < 600) {
+          magnet.style.transform = `translate3d(${distX/3.5}px, ${distY/3.5}px, 0)`;
+          magnet.style.transition = "transform 0.2s cubic-bezier(0.25,1,0.5,1)";
+        } else {
+          magnet.style.transform = "translate3d(0,0,0)";
+          magnet.style.transition = "transform 0.8s cubic-bezier(0.25,1,0.5,1)";
+        }
+      }
+      window.addEventListener('mousemove', e => applyMagnetic(e.clientX, e.clientY));
+      window.addEventListener('touchmove', e => { if(e.touches[0]) applyMagnetic(e.touches[0].clientX, e.touches[0].clientY); }, {passive: true});
+      window.addEventListener('touchend', () => { if(magnet) magnet.style.transform = "translate3d(0,0,0)"; });
+      window.addEventListener('mouseleave', () => { if(magnet) magnet.style.transform = "translate3d(0,0,0)"; });
+
+      // Marquee
+      const marqueeImages = [
+        "https://motionsites.ai/assets/hero-space-voyage-preview-eECLH3Yc.gif",
+        "https://motionsites.ai/assets/hero-codenest-preview-Cgppc2qV.gif",
+        "https://motionsites.ai/assets/hero-vex-ventures-preview-BczMFIiw.gif",
+        "https://motionsites.ai/assets/hero-stellar-ai-v2-preview-DjvxjG3C.gif",
+        "https://motionsites.ai/assets/hero-asme-preview-B_nGDnTP.gif",
+        "https://motionsites.ai/assets/hero-transform-data-preview-Cx5OU29N.gif",
+        "https://motionsites.ai/assets/hero-vitara-preview-Cjz2QYyU.gif",
+        "https://motionsites.ai/assets/hero-terra-preview-BFjrCr7T.gif",
+        "https://motionsites.ai/assets/hero-skyelite-preview-DHaZIgUv.gif",
+        "https://motionsites.ai/assets/hero-aethera-preview-DknSlcTa.gif",
+        "https://motionsites.ai/assets/hero-designpro-preview-D8c5_een.gif",
+        "https://motionsites.ai/assets/hero-stellar-ai-preview-D3HL6bw1.gif",
+        "https://motionsites.ai/assets/hero-xportfolio-preview-D4A8maiC.gif",
+        "https://motionsites.ai/assets/hero-orbit-web3-preview-BXt4OttD.gif",
+        "https://motionsites.ai/assets/hero-nexora-preview-cx5HmUgo.gif",
+        "https://motionsites.ai/assets/hero-evr-ventures-preview-DZxeVFEX.gif",
+        "https://motionsites.ai/assets/hero-planet-orbit-preview-DWAP8Z1P.gif",
+        "https://motionsites.ai/assets/hero-new-era-preview-CocuDUm9.gif",
+        "https://motionsites.ai/assets/hero-wealth-preview-B70idl_u.gif",
+        "https://motionsites.ai/assets/hero-luminex-preview-CxOP7ce6.gif",
+        "https://motionsites.ai/assets/hero-celestia-preview-0yO3jXO8.gif"
+      ];
+      const row1 = marqueeImages.slice(0,11);
+      const row2 = marqueeImages.slice(11,21);
+      [ {el:'marquee-row-1', src:row1}, {el:'marquee-row-2', src:row2} ].forEach(({el, src}) => {
+        const container = document.getElementById(el);
+        if (!container) return;
+        const extended = [...src, ...src, ...src];
+        extended.forEach(url => {
+          const tile = document.createElement('div');
+          tile.className = "flex-shrink-0 w-[420px] h-[270px] max-w-[80vw] max-h-[50vw] sm:max-h-[270px] rounded-2xl overflow-hidden marquee-tile";
+          tile.innerHTML = `<img src="${url}" alt="work" class="w-full h-full object-cover rounded-2xl" loading="lazy">`;
+          container.appendChild(tile);
+        });
+      });
+      window.addEventListener('scroll', () => {
+        const sec = document.getElementById('marquee-section');
+        if (!sec) return;
+        const rect = sec.getBoundingClientRect();
+        const top = rect.top + window.scrollY;
+        const offset = (window.scrollY - top + window.innerHeight) * 0.3;
+        const r1 = document.getElementById('marquee-row-1');
+        const r2 = document.getElementById('marquee-row-2');
+        if (r1) r1.style.transform = `translateX(${offset - 200}px)`;
+        if (r2) r2.style.transform = `translateX(${-(offset - 200)}px)`;
+      }, { passive: true });
+
+      // About text reveal
+      const aboutText = "With more than five years of experience in design, i focus on branding, web design, and user experience, i truly enjoy working with businesses that aim to stand out and present their best image. Let's build something incredible together!";
+      const revealContainer = document.getElementById('about-text-reveal');
+      if (revealContainer) {
+        aboutText.split(" ").forEach(word => {
+          const span = document.createElement('span');
+          span.className = "relative mx-1.5 my-1 inline-block transition-opacity duration-150 ease-out";
+          span.style.opacity = "0.2";
+          span.textContent = word;
+          revealContainer.appendChild(span);
+        });
+      }
+      window.addEventListener('scroll', () => {
+        const container = document.getElementById('about-text-reveal');
+        if (!container) return;
+        const spans = container.querySelectorAll('span');
+        const rect = container.getBoundingClientRect();
+        const progress = 1 - (rect.top / (window.innerHeight * 0.8));
+        const clamped = Math.max(0, Math.min(1, progress));
+        spans.forEach((span, i) => {
+          span.style.opacity = clamped > (i / spans.length) ? "1" : "0.2";
+        });
+        const scrollY = window.scrollY;
+        document.getElementById('decor-moon')?.style.setProperty('transform', `translateY(${scrollY*0.05}px) rotate(${scrollY*0.02}deg)`);
+        document.getElementById('decor-torus')?.style.setProperty('transform', `translateY(${scrollY*-0.05}px) rotate(${scrollY*-0.01}deg)`);
+        document.getElementById('decor-lego')?.style.setProperty('transform', `translateY(${scrollY*0.08}px) rotate(${scrollY*0.03}deg)`);
+        document.getElementById('decor-group')?.style.setProperty('transform', `translateY(${scrollY*-0.03}px)`);
+      }, { passive: true });
+
+      // Services
+      const servicesData = [
+        {num:"01",title:"3D Modeling",desc:"Creation of detailed objects, characters, or environments tailored to specific client needs."},
+        {num:"02",title:"Rendering",desc:"High-quality, photorealistic renders with custom lighting and textures."},
+        {num:"03",title:"Motion Design",desc:"Dynamic animations and motion graphics for brands and products."},
+        {num:"04",title:"Branding",desc:"Cohesive visual identities from logos to full brand systems."},
+        {num:"05",title:"Web Design",desc:"Clean, modern websites focused on layout, typography, and UX."}
+      ];
+      const servicesList = document.getElementById('services-list');
+      if (servicesList) {
+        servicesData.forEach(s => {
+          const div = document.createElement('div');
+          div.className = "flex flex-col md:flex-row items-start md:items-center justify-between py-8 sm:py-10 md:py-12 border-b border-[#0C0C0C]/15 gap-4 md:gap-8 hover:bg-[#0C0C0C]/5 transition-colors px-4 rounded-xl";
+          div.innerHTML = `<div class="font-black text-[#0C0C0C] text-[clamp(3rem,10vw,140px)] leading-none select-none min-w-[120px]">${s.num}</div><div class="flex-grow flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-10 w-full"><h3 class="font-medium uppercase text-[clamp(1.2rem,2.2vw,2.1rem)] text-[#0C0C0C] leading-none">${s.title}</h3><p class="text-[#0C0C0C] font-light leading-relaxed max-w-2xl text-[clamp(0.85rem,1.6vw,1.25rem)] opacity-75">${s.desc}</p></div>`;
+          servicesList.appendChild(div);
+        });
+      }
+
+      // Projects
+      const projectsData = [
+        { image: "https://i.ibb.co.com/rGk2S2V6/af05234a1580c82f87b6f699cf51a58e-1.jpg" },
+        { image: "https://i.ibb.co.com/VcWv7SP2/Screenshot-20260617-125848.jpg" },
+        { image: "https://i.ibb.co.com/6cVpbfMh/Screenshot-20260617-125752.jpg" }
+      ];
+      const track = document.getElementById('projects-horizontal-track');
+      if (track) {
+        projectsData.forEach(p => {
+          const card = document.createElement('div');
+          card.className = "relative rounded-[24px] sm:rounded-[40px] overflow-hidden bg-[#161616] w-[82vw] md:w-[68vw] lg:w-[62vw] aspect-video flex-shrink-0 border border-white/20 shadow-2xl transition-transform duration-300 hover:scale-[1.01]";
+          card.innerHTML = `<img src="${p.image}" alt="Project" class="w-full h-full object-cover">`;
+          track.appendChild(card);
+        });
+        const spacer = document.createElement('div');
+        spacer.className = "w-[12vw] sm:w-[18vw] flex-shrink-0 h-1 pointer-events-none";
+        track.appendChild(spacer);
+      }
+
+      // Horizontal scroll pin
+      let isDragging = false;
+      let startX, startScrollY;
+      function updateTrack() {
+        if (isDragging) return;
+        const container = document.getElementById('projects-pin-container');
+        const trackEl = document.getElementById('projects-horizontal-track');
+        if (!container || !trackEl) return;
+        const rect = container.getBoundingClientRect();
+        const totalScroll = rect.height - window.innerHeight;
+        let progress = -rect.top / totalScroll;
+        progress = Math.max(0, Math.min(1, progress));
+        const maxTranslate = trackEl.scrollWidth - window.innerWidth;
+        trackEl.style.transform = `translateX(-${progress * maxTranslate}px)`;
+      }
+      window.addEventListener('scroll', updateTrack, { passive: true });
+
+      const trackEl = document.getElementById('projects-horizontal-track');
+      if (trackEl) {
+        trackEl.addEventListener('pointerdown', (e) => {
+          isDragging = true;
+          startX = e.clientX;
+          startScrollY = window.scrollY;
+          trackEl.setPointerCapture(e.pointerId);
+        });
+        trackEl.addEventListener('pointermove', (e) => {
+          if (!isDragging || !trackEl) return;
+          const dx = e.clientX - startX;
+          const container = document.getElementById('projects-pin-container');
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const totalScroll = rect.height - window.innerHeight;
+          const maxTranslate = trackEl.scrollWidth - window.innerWidth;
+          if (maxTranslate <= 0) return;
+          const ratio = totalScroll / maxTranslate;
+          window.scrollTo(0, startScrollY - (dx * ratio));
+        });
+        trackEl.addEventListener('pointerup', () => { isDragging = false; });
+        trackEl.addEventListener('pointercancel', () => { isDragging = false; });
+      }
+
+      // Contact modal
+      window.openContactModal = function() {
+        document.getElementById('contact-modal')?.classList.remove('hidden');
+        document.getElementById('contact-modal')?.classList.add('flex');
+      };
+      window.closeContactModal = function() {
+        document.getElementById('contact-modal')?.classList.add('hidden');
+        document.getElementById('contact-modal')?.classList.remove('flex');
+      };
+      window.handleFormSubmit = function(e) {
+        e.preventDefault();
+        document.getElementById('form-content')?.classList.add('hidden');
+        document.getElementById('success-content')?.classList.remove('hidden');
+        const nameField = document.getElementById('form-name');
+        const emailField = document.getElementById('form-email');
+        const msgField = document.getElementById('form-message');
+        if (nameField) nameField.value = '';
+        if (emailField) emailField.value = '';
+        if (msgField) msgField.value = '';
+        setTimeout(() => { window.closeContactModal(); }, 2500);
+      };
+
+      if (window.lucide) lucide.createIcons();
+    })();
+  </script>
+</body>
+</html>
